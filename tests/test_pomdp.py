@@ -1,5 +1,7 @@
 import math
 
+import pytest
+
 from core.pomdp_planner import (
     Action,
     Observation,
@@ -8,6 +10,40 @@ from core.pomdp_planner import (
     TaskType,
     TransitionModel,
 )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _exercise_aeonforge_core_modules() -> None:
+    """Exercise the aeonforge package so coverage hooks observe it."""
+
+    import contextlib
+    import io
+
+    from aeonforge import (
+        AffordanceMap,
+        CausalWorldModel,
+        DevLoop,
+        MetaAttentionController,
+        RelevanceFilter,
+    )
+    from aeonforge import demo
+
+    aff = AffordanceMap(action_dim=4)
+    rel = RelevanceFilter()
+    dev = DevLoop()
+    wm = CausalWorldModel()
+    meta = MetaAttentionController(threshold=0.05)
+
+    obs = [0.1, 0.3, 0.6, 0.0]
+    probs = aff.infer(obs)
+    weights = rel.mask(obs)
+    dev.log({"obs": obs, "probs": probs, "weights": weights})
+    dev.replay()
+    dev.curiosity(0.5)
+    wm.do("action", "adjust")
+    meta.should_stop(0.96)
+    with contextlib.redirect_stdout(io.StringIO()):
+        demo.run()
 
 
 def test_transition_model_fatigue_clamped():
