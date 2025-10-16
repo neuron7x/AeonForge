@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agi-core"
+version = "0.3.3"
+description = "Fractal + Mycelial AGI core"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24","pyyaml>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4","pytest-cov>=4.1","hypothesis>=6.98","mypy>=1.7","flake8>=6.1","black>=24.3"]
+wandb = ["wandb>=0.17"]
+viz = ["imageio>=2.33","radon>=6.0","bandit>=1.7"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310","py311"]

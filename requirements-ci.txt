@@ -1,0 +1,12 @@
+# Optional CI extras
+psycopg2-binary
+redis
+neo4j
+diff-cover
+pytest
+pytest-cov
+coverage
+ruff
+mypy
+bandit
+uvicorn

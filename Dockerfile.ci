@@ -1,0 +1,8 @@
+FROM python:3.11-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY pyproject.toml* requirements*.txt* ./
+RUN --mount=type=cache,target=/root/.cache/pip bash -lc '    if [ -f requirements.txt ]; then pip install -r requirements.txt;     elif [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt;     elif [ -f pyproject.toml ]; then pip install .;     else pip install fastapi uvicorn httpx; fi'
+COPY . .
+ENV API_APP_MODULE=${API_APP_MODULE:-api:app}
+CMD ["bash","-lc","uvicorn ${API_APP_MODULE:-api:app} --host 0.0.0.0 --port 8000"]

@@ -1,0 +1,112 @@
+version: '3.9'
+
+services:
+  app-under-test:
+    build: .
+    image: app-under-test:${GITHUB_SHA:-local}
+    container_name: app-under-test
+    environment:
+      - APP_MODULE=${APP_MODULE:-api:app}
+      - LOG_LEVEL=INFO
+      - JWT_SECRET=dev-secret
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
+    command: uvicorn ${APP_MODULE:-api:app} --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      redis:
+        condition: service_started
+      neo4j:
+        condition: service_started
+      timescaledb:
+        condition: service_healthy
+      clickhouse:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+
+  neo4j:
+    image: neo4j:5
+    container_name: neo4j-db
+    environment:
+      - NEO4J_AUTH=neo4j/test1234
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -a bolt://localhost:7687 -u neo4j -p test1234 'RETURN 1;' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  timescaledb:
+    image: timescale/timescaledb-ha:pg16-latest
+    container_name: timescaledb
+    environment:
+      - POSTGRES_DB=timeseries
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./configs/grafana:/etc/grafana:ro
+    depends_on:
+      - timescaledb
+      - clickhouse
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.97.0
+    container_name: otel-collector
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./configs/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+
+  reverse-proxy:
+    image: traefik:v2.11
+    container_name: reverse-proxy
+    command: ["--providers.file.filename=/etc/traefik/traefik.yaml", "--api.dashboard=true"]
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - ./configs/reverse-proxy/traefik.yaml:/etc/traefik/traefik.yaml:ro
+    depends_on:
+      - app-under-test
+      - grafana
