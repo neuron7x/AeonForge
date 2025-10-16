@@ -1,157 +1,38 @@
-# AeonForge
+# PromptOps Bot 🤖 — Production-Ready
 
-**Коротко (TL;DR):** Мінімальне когнітивне ядро з людиною в контурі. 5 модулів (`Affordance`, `Relevance`, `DevLoop`, `CausalWM`, `MetaCtrl`) + конфіги. Без магії. Запустив — отримав артефакт/дію.
+Telegram бот для роздачі завдань пакетами (batch), автоматичної верифікації GitHub PR і виплат після *повного* виконання пачки.
 
-> Статус: **alpha**. Тестовано на Ubuntu 22.04 / Python 3.11 / CPU Torch.
-
----
-
-## Що це?
-AeonForge — це набір **практичних модулів** для побудови когнітивного циклу:
-- `AffordanceMap` — повертає базові “можливі дії” для спостереження.
-- `RelevanceFilter` — нормалізує ваги / відфільтровує шум.
-- `DevLoop` — буфер досвіду, простий curiosity, офлайн replay.
-- `CausalWorldModel` — примітивний `do()` для контрфактуального кроку.
-- `MetaAttentionController` — приймає рішення “достатньо / стоп” по метриці.
-
-**Навіщо:** скласти з цих блоків петлю “сприйняття → план → дія → пам’ять” з людиною у контурі (Human‑in‑the‑Loop).
-
----
-
-## Вимоги
-- Python **3.11**
-- `pip`, `venv`
-- CPU‑версія PyTorch (не потребує CUDA)
-
----
-
-## Встановлення
+## 🚀 Швидкий старт
 ```bash
-python -m venv .venv && source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install --index-url https://download.pytorch.org/whl/cpu torch==2.* --only-binary=:all:
-pip install -e .
+cp .env.template .env            # заповни BOT_TOKEN, WEBHOOK_BASE_URL, WEBHOOK_SECRET, GITHUB_TOKEN
+chmod +x install.sh
+./install.sh
 ```
 
-> Якщо використовуєш `requirements.txt`: `pip install -r requirements.txt`
+## 📦 Що вміє
+- Роздає N завдань за раз як *пачку* (batch). Оплата — тільки коли всі з цієї пачки approved.
+- Дедлайн 24h (налаштовується).
+- Автоверіфікація PR: merged + changed_files>0 (+ опціональна перевірка членства в org).
+- Payout webhook після завершення пачки (або pending якщо не налаштовано).
+- Atomic take (Postgres `FOR UPDATE SKIP LOCKED`), Redis rate-limit, Prometheus метрики, JSON-логи.
+- Docker, docker-compose, Alembic, Celery, Redis, Postgres, CI/CD.
 
----
+## 📚 Команди в Telegram
+- `/tasks` — показати доступні завдання
+- `/take N` — взяти N завдань (створює batch)
+- `/my` — мої завдання
+- `/submit ID URL` — надіслати PR-посилання
+- `/help` — довідка
 
-## Швидкий старт
-Запустити демонстрацію:
-```bash
-python run.py +demo=true
+## 🧪 Тести
 ```
-Очікуваний вихід (спрощено):
-```
-Affordance: [0.125, 0.125, ...]
-Relevance: [0.125, 0.125, ...]
-DevLoop replay: [... останні записи ...]
-WorldModel do(): {'action': 'adjust', 'effect': 'counterfactual-updated'}
-Meta should_stop: True|False
-```
-
----
-
-## Мінімальний кодовий приклад
-```python
-from aeonforge import AffordanceMap, RelevanceFilter, DevLoop, CausalWorldModel, MetaAttentionController
-
-aff = AffordanceMap()
-rel = RelevanceFilter()
-dev = DevLoop()
-wm  = CausalWorldModel()
-meta = MetaAttentionController(threshold=0.1)
-
-obs = [0.2, 0.5, 0.3]
-actions = aff.infer(obs)         # список ймовірностей дій
-weights = rel.mask(actions)      # нормалізовані ваги
-dev.log({"obs": obs, "a": actions, "w": weights})
-cf = wm.do("action", "adjust")   # контрфакт
-stop = meta.should_stop(0.92)    # зупинка за метрикою
-print(actions, weights, cf, stop)
-```
-
----
-
-## Конфігурації (YAML)
-`configs/default.yaml`
-```yaml
-seed: 42
-task: demo
-logging:
-  level: INFO
-cbc:
-  enable: true
-  eoi_threshold: 1.0
-```
-
-`configs/human_loop.yaml`
-```yaml
-agents:
-  - role: architect
-  - role: critic
-  - role: integrator
-publish:
-  targets: [console]
-```
-
----
-
-## Структура репозиторію
-```
-.
-├─ src/aeonforge/        # модулі ядра
-│  ├─ affordance.py
-│  ├─ relevance.py
-│  ├─ devloop.py
-│  ├─ world_model.py
-│  ├─ meta.py
-│  └─ demo.py
-├─ configs/              # конфіги
-│  ├─ default.yaml
-│  └─ human_loop.yaml
-├─ tests/                # мінімальні тести (smoke)
-│  └─ test_smoke.py
-├─ docs/                 # короткі технічні нотатки
-├─ run.py                # CLI для демо
-├─ pyproject.toml        # пакетна збірка (editable install)
-└─ README.md
-```
-
----
-
-## Тести
-```bash
 pytest -q
 ```
-> У CI використовується CPU‑Torch і `pip install -e .` (див. `.github/workflows/ci.yml`).
 
-Мінімальний тест (щоб CI був зелений):
-```python
-def test_imports():
-    import aeonforge as core
-    assert hasattr(core, "AffordanceMap")
-    assert hasattr(core, "MetaAttentionController")
-```
+## 🔐 Безпека
+- Вебхук перевіряє `X-Telegram-Bot-Api-Secret-Token` на точний збіг з `WEBHOOK_SECRET`.
+- Секрети через `.env`/CI secrets. Не коміть токени.
 
----
-
-## Обмеження / що **не** входить
-- Немає складних середовищ RL та великих моделей — **тільки каркас**.
-- Немає гарантованої стабільності API — **alpha**.
-- Немає CUDA‑залежностей у CI за замовчуванням.
-
----
-
-## Дорожня карта (коротко)
-- [ ] Консистентні інтерфейси між модулями (вхід/вихід типізувати).
-- [ ] Приклади інтеграції Human‑in‑the‑Loop (форми/CLI).
-- [ ] Більше тестів: property‑based, інтеграційні.
-- [ ] Логування подій та простий веб‑UI.
-- [ ] Базові бенчмарки (час/памʼять).
-
----
-
-## Ліцензія
-MIT
+## 🛠 Розгортання
+- Локально: `docker-compose up -d`
+- Reverse proxy (nginx) у `docker/nginx.conf` (TLS — через ваш termination, напр. Caddy/Traefik/Cloudflare Tunnel).

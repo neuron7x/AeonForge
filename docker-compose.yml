@@ -1,0 +1,90 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    container_name: promptops_web
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./app:/app/app
+    networks:
+      - promptops
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build: .
+    container_name: promptops_worker
+    env_file: .env
+    command: celery -A app.tasks.celery_app worker --loglevel=info -Q default
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+    networks:
+      - promptops
+
+  beat:
+    build: .
+    container_name: promptops_beat
+    env_file: .env
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+    networks:
+      - promptops
+
+  redis:
+    image: redis:7-alpine
+    container_name: promptops_redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redispass}
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - promptops
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: postgres:15-alpine
+    container_name: promptops_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-botpass}
+      POSTGRES_DB: ${POSTGRES_DB:-botdb}
+      POSTGRES_INITDB_ARGS: "-c max_connections=200"
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - promptops
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pgdata:
+  redis_data:
+
+networks:
+  promptops:
+    driver: bridge
