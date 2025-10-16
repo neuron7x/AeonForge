@@ -6,11 +6,12 @@ ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential gcc libpq-dev curl && rm -rf /var/lib/apt/lists/*
+    build-essential gcc libpq-dev && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --upgrade pip setuptools wheel && \
-    pip wheel --no-cache-dir -r requirements.txt -w /wheels
+    pip wheel --no-cache-dir -r requirements.txt -w /wheels && \
+    cp requirements.txt /wheels/requirements.txt
 
 # Stage 2 — runtime
 FROM python:3.11-slim
@@ -20,7 +21,7 @@ ENV PYTHONUNBUFFERED=1
 
 RUN useradd -m -u 1000 botuser && \
     apt-get update && apt-get install -y --no-install-recommends \
-    postgresql-client curl && rm -rf /var/lib/apt/lists/*
+    postgresql-client && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /wheels /wheels
 RUN pip install --no-index --find-links=/wheels -r /wheels/requirements.txt

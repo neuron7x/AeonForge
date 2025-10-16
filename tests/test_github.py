@@ -1,32 +1,48 @@
+import os
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+
+os.environ.setdefault("BOT_TOKEN", "test")
+os.environ.setdefault("WEBHOOK_BASE_URL", "https://example.com")
+os.environ.setdefault("WEBHOOK_SECRET", "secret")
+os.environ.setdefault("GITHUB_TOKEN", "test")
+
 from app.github_verifier import extract_pr_info, verify_github_pr
-from unittest.mock import AsyncMock, patch
+
 
 @pytest.mark.asyncio
-async def test_extract_pr_info():
-    url = "https://github.com/owner/repo/pull/123"
-    assert extract_pr_info(url) == ("owner/repo", 123)
-    assert extract_pr_info("https://github.com/invalid") is None
+async def test_extract_pr_info_parses_url():
+    result = await extract_pr_info("https://github.com/org/repo/pull/42")
+    assert result == ("org/repo", 42)
+
 
 @pytest.mark.asyncio
-async def test_verify_github_pr_merged():
+async def test_extract_pr_info_invalid_url():
+    result = await extract_pr_info("https://github.com/org/repo")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_verify_github_pr_handles_org_membership():
     with patch("app.github_verifier.httpx.AsyncClient") as mock_client:
-        mock_resp = AsyncMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
+        pull_response = MagicMock()
+        pull_response.status_code = 200
+        pull_response.json.return_value = {
             "merged": True,
             "user": {"login": "author"},
-            "title": "Fix",
-            "_links": {"self": {"href": "https://api.github.com/repos/owner/repo/pulls/123"}}
+            "title": "Awesome feature",
         }
-        mock_files = AsyncMock()
-        mock_files.status_code = 200
-        mock_files.json.return_value = [{"filename": "a.txt"}]
 
-        inst = AsyncMock()
-        inst.get = AsyncMock(side_effect=[mock_resp, mock_files])
-        mock_client.return_value.__aenter__.return_value = inst
+        org_response = MagicMock()
+        org_response.status_code = 204
 
-        res = await verify_github_pr("https://github.com/owner/repo/pull/123")
-        assert res["verified"] is True
-        assert res["merged"] is True
+        instance = AsyncMock()
+        instance.get = AsyncMock(side_effect=[pull_response, org_response])
+        mock_client.return_value.__aenter__.return_value = instance
+
+        with patch("app.config.settings.GITHUB_ORG", "promptops"):
+            result = await verify_github_pr("https://github.com/org/repo/pull/101")
+
+        assert result["verified"] is True
+        assert result["message"] == "PR merged and author is org member"

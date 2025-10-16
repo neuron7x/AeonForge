@@ -1,16 +1,20 @@
-from pydantic_settings import BaseSettings
-from typing import Optional, List
+from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
+    """Application configuration parsed from environment variables."""
+
     # Telegram
     BOT_TOKEN: str
     WEBHOOK_BASE_URL: str
     WEBHOOK_PATH: str = "/webhook"
     WEBHOOK_SECRET: str
-    ADMIN_IDS: List[int] | str = []
+    ADMIN_IDS: list[int] | str = []
     ADMIN_SECRET: str = "change-me"
 
-    # DB
+    # Database
     DATABASE_URL: str = "postgresql+asyncpg://bot:botpass@db:5432/botdb"
 
     # Redis / Celery
@@ -30,31 +34,18 @@ class Settings(BaseSettings):
     # App
     TASK_DEADLINE_HOURS: int = 24
     MAX_ASSIGN_PER_USER: int = 100
-    TAKE_RATE_LIMIT_PER_MINUTE: int = 5
     LOG_LEVEL: str = "info"
     ENVIRONMENT: str = "development"
     SENTRY_DSN: Optional[str] = None
-    LEVEL_THRESHOLDS: List[int] | str = [0, 10, 25, 45]
-    QC_MAX_DEDUP_SCORE: float = 0.85
-    QC_MAX_TOXICITY: float = 0.1
-    QC_ALLOW_PII: bool = False
-    QC_MIN_FACT_SCORE: float = 0.6
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+
 
 settings = Settings()
 
-# Normalize admin ids if string
 if isinstance(settings.ADMIN_IDS, str):
-    settings.ADMIN_IDS = [int(x.strip()) for x in settings.ADMIN_IDS.split(",") if x.strip()]
+    settings.ADMIN_IDS = [int(item.strip()) for item in settings.ADMIN_IDS.split(",") if item.strip()]
 
-if isinstance(settings.LEVEL_THRESHOLDS, str):
-    settings.LEVEL_THRESHOLDS = [int(x.strip()) for x in settings.LEVEL_THRESHOLDS.split(",") if x.strip()]
-settings.LEVEL_THRESHOLDS = sorted({int(x) for x in settings.LEVEL_THRESHOLDS})
-
-# Defaults for Celery
 if not settings.CELERY_BROKER_URL:
     settings.CELERY_BROKER_URL = settings.REDIS_URL
 if not settings.CELERY_RESULT_BACKEND:
