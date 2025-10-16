@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cbc-api-svc
+  namespace: cbc-omega-squared
+spec:
+  type: ClusterIP
+  selector:
+    app: cbc-api
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000

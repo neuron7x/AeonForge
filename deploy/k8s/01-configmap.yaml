@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cbc-config
+  namespace: cbc-omega-squared
+data:
+  LOG_LEVEL: "INFO"
+  NUM_PARTICLES: "500"
+  NUM_SIMULATIONS: "300"
+  MAX_DEPTH: "8"

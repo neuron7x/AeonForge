@@ -1,0 +1,27 @@
+flowchart LR
+    client["Clients / Automation\n(biometric collectors, operator UI)"]
+    ingress["NGINX Ingress\n(api.cbc-omega-squared.local)"]
+    service["ClusterIP Service\ncbc-api-svc"]
+
+    subgraph Deployment["cbc-api Deployment (2 replicas)"]
+        subgraph Pod["FastAPI Pod"]
+            api["FastAPI app\n(infrastructure/api.py)"]
+            biometric["BiometricEngine\n(core/biometric_engine.py)"]
+            pomdp["POMDPPlanner\n(core/pomdp_planner.py)"]
+            metrics["Prometheus client\n(infrastructure/metrics.py)"]
+            secret[["Secret:\nJWT_SECRET"]]
+            config[["ConfigMap:\nNUM_PARTICLES\nNUM_SIMULATIONS\nMAX_DEPTH"]]
+        end
+    end
+
+    prometheus[("Prometheus\nscraper")]
+
+    client --> ingress --> service --> api
+    service --> Deployment
+    api --> biometric
+    api --> pomdp
+    api --> metrics
+    biometric --> pomdp
+    metrics --> prometheus
+    secret -. env .-> api
+    config -. env .-> api

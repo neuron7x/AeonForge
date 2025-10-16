@@ -1,0 +1,21 @@
+# CBC-Ω²/NeuroCrowd Traceability Matrix
+
+| Capability | Architecture Reference | Implementation Modules | Validating Tests | Status |
+| --- | --- | --- | --- | --- |
+| Fractal agent hierarchy enabling recursive delegation | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L4-L7】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L15-L19】 | agi_core/fractal/node.py【F:agi_core/fractal/node.py†L33-L142】<br>agi_core/fractal/network.py【F:agi_core/fractal/network.py†L18-L52】<br>agi_core/integration/mycelium_np.py【F:agi_core/integration/mycelium_np.py†L5-L52】 | tests/test_fractal.py【F:tests/test_fractal.py†L32-L186】<br>tests/test_mycelium.py【F:tests/test_mycelium.py†L1-L11】 | Implemented |
+| Energy-aware scaling of subagents | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L9-L9】 | agi_core/fractal/scheduler.py【F:agi_core/fractal/scheduler.py†L10-L49】 | tests/test_fractal.py【F:tests/test_fractal.py†L48-L68】 | Implemented |
+| Delegated prompting with POMDP planner | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L4-L5】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L10-L10】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L82-L84】 | core/pomdp_planner.py【F:core/pomdp_planner.py†L14-L271】<br>infrastructure/api.py【F:infrastructure/api.py†L133-L177】 | tests/test_pomdp.py【F:tests/test_pomdp.py†L1-L11】<br>tests/test_api.py【F:tests/test_api.py†L14-L44】 | Implemented |
+| Edge-first biometric adaptation & privacy | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L4-L5】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L21-L29】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L95-L99】 | core/biometric_engine.py【F:core/biometric_engine.py†L18-L200】<br>infrastructure/api.py【F:infrastructure/api.py†L106-L131】 | tests/test_biometric.py【F:tests/test_biometric.py†L11-L61】<br>tests/test_api.py【F:tests/test_api.py†L14-L44】 | Implemented |
+| Semantic memory via knowledge graph episodes | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L11-L11】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L31-L41】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L90-L93】 | agi_core/integration/neurocrowd.py【F:agi_core/integration/neurocrowd.py†L84-L343】 | tests/test_neurocrowd.py【F:tests/test_neurocrowd.py†L96-L175】 | Implemented |
+| Observability and telemetry metrics | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L77-L77】 | infrastructure/metrics.py【F:infrastructure/metrics.py†L1-L9】<br>infrastructure/api.py【F:infrastructure/api.py†L86-L104】 | tests/test_api.py【F:tests/test_api.py†L9-L13】 | Implemented |
+| Access control & compliance guardrails | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L55-L58】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L76-L76】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L98-L99】 | infrastructure/security.py【F:infrastructure/security.py†L1-L22】<br>infrastructure/api.py【F:infrastructure/api.py†L106-L177】 | tests/test_api.py【F:tests/test_api.py†L14-L44】 | Implemented |
+| Agent manager orchestrating subagents | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L82-L88】 | infrastructure/api.py【F:infrastructure/api.py†L60-L191】 | tests/test_api.py【F:tests/test_api.py†L14-L44】 | Implemented |
+| Edge & cloud subagent mesh | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L86-L88】 | agi_core/integration/mycelium_np.py【F:agi_core/integration/mycelium_np.py†L5-L52】<br>agi_core/fractal/node.py【F:agi_core/fractal/node.py†L33-L142】 | tests/test_fractal.py【F:tests/test_fractal.py†L32-L186】<br>tests/test_mycelium.py【F:tests/test_mycelium.py†L1-L11】 | Implemented |
+| Kubernetes autoscaling & message queues | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L8-L8】 | — | — | Backlog |
+| Infrastructure-as-code stack | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L73-L75】 | — | — | Backlog |
+| CI/CD pipeline automation | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L60-L71】【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L75-L75】 | — | — | Backlog |
+| Policy-as-code enforcement | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L76-L76】 | — | — | Backlog |
+| AIOps alerting | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L78-L78】 | — | — | Backlog |
+| Operational CLI & Web UI | 【F:docs/CBC_Omega2_NeuroCrowd_Architecture_UA.md†L100-L102】 | — | — | Backlog |
+
+Backlog items should be scheduled for future iterations to align the implementation with the architecture specification.
