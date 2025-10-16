@@ -13,7 +13,15 @@ def extract_pr_info(url: str):
 
 async def verify_github_pr(pr_url: str) -> dict:
     start = time.time()
-    result = {"verified": False, "merged": False, "author": "", "title": "", "message": ""}
+    result = {
+        "verified": False,
+        "merged": False,
+        "author": "",
+        "title": "",
+        "message": "",
+        "artifact_text": "",
+        "changed_files": [],
+    }
     try:
         info = extract_pr_info(pr_url)
         if not info:
@@ -44,6 +52,18 @@ async def verify_github_pr(pr_url: str) -> dict:
             if files_resp.status_code == 200:
                 files = files_resp.json()
                 changed_ok = len(files) > 0
+                patches = []
+                filenames = []
+                for file_entry in files:
+                    filename = file_entry.get("filename")
+                    if filename:
+                        filenames.append(filename)
+                    patch = file_entry.get("patch")
+                    if patch:
+                        patches.append(patch)
+                if patches:
+                    result["artifact_text"] = "\n".join(patches)[:50000]
+                result["changed_files"] = filenames
 
             # Optional org membership check
             if settings.GITHUB_ORG:

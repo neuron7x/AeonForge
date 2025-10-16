@@ -1,14 +1,19 @@
+import json
 from datetime import datetime, timedelta, timezone
+from typing import Dict
+
 from sqlalchemy import select, text, func
 from telegram import Bot
 from telegram.error import TelegramError
 
 from app.db import AsyncSessionLocal
-from app.models import User, Task, Assignment, Batch, AuditLog
+from app.models import User, Task, Assignment, Batch, AuditLog, Payment
 from app.config import settings
 from app.monitoring import log, assignments_submitted
 from app.tasks import verify_assignment
 from app.utils import rate_limit_take
+from app.reputation import refresh_user_level
+from app.task_spec import build_task_template
 
 bot = Bot(token=settings.BOT_TOKEN)
 
@@ -16,7 +21,11 @@ async def get_or_create_user(session, tg_user: dict) -> User:
     res = await session.execute(select(User).filter_by(tg_id=tg_user["id"]))
     u = res.scalar_one_or_none()
     if not u:
-        u = User(tg_id=tg_user["id"], username=tg_user.get("username",""), display_name=(tg_user.get("first_name","") + " " + tg_user.get("last_name","")))
+        u = User(
+            tg_id=tg_user["id"],
+            username=tg_user.get("username", ""),
+            display_name=(tg_user.get("first_name", "") + " " + tg_user.get("last_name", "")).strip(),
+        )
         session.add(u)
         await session.commit()
         await session.refresh(u)
@@ -37,18 +46,53 @@ async def send(chat_id: int, text: str, markdown=False):
 async def cmd_start(chat_id: int, tg_user: dict):
     async with AsyncSessionLocal() as session:
         u = await get_or_create_user(session, tg_user)
+        await refresh_user_level(session, u)
         await log_audit(session, u.id, "start", "User started bot")
-    await send(chat_id, "Привіт! /tasks — переглянути завдання, /take N — взяти, /my — прогрес, /submit ID URL — надіслати доказ, /help — довідка.")
+    await send(
+        chat_id,
+        "Привіт! Використовуй /task щоб отримати бриф, /tasks — перелік, /take N — взяти пачку, /my — прогрес, /stats — аналітика, /submit <ID> <дані> — здати.",
+    )
 
-async def cmd_tasks(chat_id: int):
+async def cmd_tasks(chat_id: int, tg_user: dict):
     async with AsyncSessionLocal() as session:
-        res = await session.execute(select(Task).filter_by(status="available").limit(20))
+        u = await get_or_create_user(session, tg_user)
+        await refresh_user_level(session, u)
+        res = await session.execute(
+            select(Task)
+            .filter_by(status="available")
+            .where(Task.level_required <= u.level)
+            .order_by(Task.created_at.asc())
+            .limit(20)
+        )
         tasks = res.scalars().all()
     if not tasks:
         await send(chat_id, "Наразі немає доступних завдань 😕")
     else:
-        lines = [f"#{t.id} — {t.title}\n💰 {t.reward_cents/100:.2f}$ | 📌 {t.requirement}" for t in tasks]
+        lines = [
+            f"#{t.id} — {t.title}\n💰 {t.reward_cents/100:.2f}$ | 📌 {t.requirement} | lvl ≥ {t.level_required}"
+            for t in tasks
+        ]
         await send(chat_id, "\n\n".join(lines))
+
+
+async def cmd_task(chat_id: int, tg_user: dict):
+    async with AsyncSessionLocal() as session:
+        u = await get_or_create_user(session, tg_user)
+        await refresh_user_level(session, u)
+        res = await session.execute(
+            select(Task)
+            .filter_by(status="available")
+            .where(Task.level_required <= u.level)
+            .order_by(Task.created_at.asc())
+            .limit(1)
+        )
+        task = res.scalar_one_or_none()
+    if not task:
+        await send(chat_id, "Завдань у твоєму рівні поки немає. Повернись згодом!")
+        return
+    template = build_task_template(task)
+    template_text = json.dumps(template, ensure_ascii=False, indent=2)
+    await send(chat_id, f"🧾 Бриф:\n{template_text}")
 
 async def cmd_take(chat_id: int, tg_user: dict, count: int = 1):
     if count <= 0: count = 1
@@ -56,6 +100,7 @@ async def cmd_take(chat_id: int, tg_user: dict, count: int = 1):
 
     async with AsyncSessionLocal() as session:
         u = await get_or_create_user(session, tg_user)
+        await refresh_user_level(session, u)
 
         # Rate limit
         if not await rate_limit_take(u.id):
@@ -79,13 +124,13 @@ async def cmd_take(chat_id: int, tg_user: dict, count: int = 1):
                 SET status='assigned'
                 WHERE id IN (
                     SELECT id FROM tasks
-                    WHERE status='available'
+                    WHERE status='available' AND level_required <= :level
                     FOR UPDATE SKIP LOCKED
                     LIMIT :n
                 )
                 RETURNING id
             """)
-            res_ids = await session.execute(sql, {"n": to_take})
+            res_ids = await session.execute(sql, {"n": to_take, "level": u.level})
             task_ids = [row[0] for row in res_ids.fetchall()]
 
             if not task_ids:
@@ -106,7 +151,7 @@ async def cmd_take(chat_id: int, tg_user: dict, count: int = 1):
         text_resp = (
             f"✅ Ти взяв {len(task_ids)} завдань у пачці #{batch.id}!\n\n"
             f"⏰ Дедлайн: {due_at.strftime('%Y-%m-%d %H:%M')} UTC\n"
-            f"Надсилай докази так: `/submit <assignment_id> <github_pr_url>`\n"
+            f"Надсилай роботи так: `/submit <assignment_id> <payload|url>`\n"
             f"Оплата надійде після виконання *всієї* пачки."
         )
         await send(chat_id, text_resp, markdown=True)
@@ -125,15 +170,20 @@ async def cmd_my(chat_id: int, tg_user: dict):
         lines.append(f"{icon} AID:{a.id} | Task:{a.task_id} | Batch:{a.batch_id or '-'} | До: {a.due_at.strftime('%Y-%m-%d %H:%M')} UTC | {a.status}")
     await send(chat_id, "\n\n".join(lines))
 
-async def cmd_submit(chat_id: int, tg_user: dict, parts: list[str]):
+async def cmd_submit(chat_id: int, tg_user: dict, text: str):
+    parts = text.split(maxsplit=2)
     if len(parts) < 3:
-        await send(chat_id, "Формат: `/submit <assignment_id> <github_pr_url>`", markdown=True)
+        await send(chat_id, "Формат: `/submit <assignment_id> <дані>`", markdown=True)
         return
     try:
         aid = int(parts[1])
-        url = parts[2]
+        payload = parts[2].strip()
     except Exception:
         await send(chat_id, "❌ Невірний формат.")
+        return
+
+    if not payload:
+        await send(chat_id, "❌ Немає даних для відправки.")
         return
 
     async with AsyncSessionLocal() as session:
@@ -146,23 +196,77 @@ async def cmd_submit(chat_id: int, tg_user: dict, parts: list[str]):
         if a.status != "assigned":
             await send(chat_id, f"❌ Стан завдання: {a.status}.")
             return
-        a.evidence_url = url
+        if payload.lower().startswith("http"):
+            a.evidence_url = payload
+            a.submission_payload = None
+        else:
+            a.submission_payload = payload
+            a.evidence_url = None
         a.status = "submitted"
         a.submitted_at = datetime.now(timezone.utc)
         await session.commit()
         assignments_submitted.inc()
-        await log_audit(session, u.id, "submit_evidence", f"Assignment {aid}", url)
+        await log_audit(session, u.id, "submit_evidence", f"Assignment {aid}", payload)
 
-    await send(chat_id, f"✅ Доказ отримано для #{aid}. Іде перевірка...")
+    await send(chat_id, f"✅ Дані отримано для #{aid}. Іде перевірка...")
     verify_assignment.delay(aid)
+
+
+async def _period_stats(session, user: User, start: datetime) -> Dict[str, float | int]:
+    res = await session.execute(
+        select(Assignment.status, Assignment.reviewed_at)
+        .where(Assignment.user_id == user.id)
+        .where(Assignment.reviewed_at.is_not(None))
+        .where(Assignment.reviewed_at >= start)
+    )
+    statuses = [row[0] for row in res.fetchall()]
+    approved = statuses.count("approved")
+    rejected = statuses.count("rejected")
+
+    payout_res = await session.execute(
+        select(func.sum(Payment.amount_cents))
+        .where(Payment.user_id == user.id)
+        .where(Payment.status == "paid")
+        .where(Payment.created_at >= start)
+    )
+    payout_cents = payout_res.scalar() or 0
+    return {
+        "approved": approved,
+        "rejected": rejected,
+        "payout_usd": round(payout_cents / 100, 2),
+    }
+
+
+async def cmd_stats(chat_id: int, tg_user: dict):
+    now = datetime.now(timezone.utc)
+    start_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_week = now - timedelta(days=7)
+
+    async with AsyncSessionLocal() as session:
+        u = await get_or_create_user(session, tg_user)
+        await refresh_user_level(session, u)
+        today = await _period_stats(session, u, start_day)
+        week = await _period_stats(session, u, start_week)
+        level = u.level
+        reputation = u.reputation_score
+
+    text = (
+        f"📊 *Статистика*\n"
+        f"Рівень: {level} | Репутація: {reputation:.1f}\n\n"
+        f"Сьогодні — ✅ {today['approved']} | ❌ {today['rejected']} | 💵 ${today['payout_usd']:.2f}\n"
+        f"7 днів — ✅ {week['approved']} | ❌ {week['rejected']} | 💵 ${week['payout_usd']:.2f}"
+    )
+    await send(chat_id, text, markdown=True)
 
 async def cmd_help(chat_id: int):
     text = (
         "📖 *PromptOpsBot — команди*\n\n"
-        "`/tasks` — доступні завдання\n"
-        "`/take N` — взяти N завдань (формує пачку)\n"
-        "`/my` — мої завдання\n"
-        "`/submit ID URL` — надіслати PR-посилання\n\n"
+        "`/task` — видати бриф у JSON\n"
+        "`/tasks` — переглянути доступні задачі\n"
+        "`/take N` — взяти N задач у пачку\n"
+        "`/my` — всі мої задачі\n"
+        "`/stats` — статистика та виплати\n"
+        "`/submit ID payload` — надіслати артефакт або посилання\n\n"
         "Оплата — коли вся пачка завершена (approved)."
     )
     await send(chat_id, text, markdown=True)
@@ -177,17 +281,20 @@ async def handle_update(update_json: dict):
 
             if text.startswith("/start"):
                 await cmd_start(chat_id, tg_user)
+            elif text.startswith("/task"):
+                await cmd_task(chat_id, tg_user)
             elif text.startswith("/tasks"):
-                await cmd_tasks(chat_id)
+                await cmd_tasks(chat_id, tg_user)
             elif text.startswith("/take"):
                 parts = text.split()
                 n = int(parts[1]) if len(parts) > 1 else 1
                 await cmd_take(chat_id, tg_user, n)
             elif text.startswith("/my"):
                 await cmd_my(chat_id, tg_user)
+            elif text.startswith("/stats"):
+                await cmd_stats(chat_id, tg_user)
             elif text.startswith("/submit"):
-                parts = text.split()
-                await cmd_submit(chat_id, tg_user, parts)
+                await cmd_submit(chat_id, tg_user, text)
             elif text.startswith("/help"):
                 await cmd_help(chat_id)
             else:
