@@ -86,7 +86,10 @@ class TransitionModel:
         new_eoi = max(0.0, state.eoi - eoi_reduction + float(np.random.normal(0, self.noise_std)))
 
         fatigue_inc = self.fatigue_acc_rate * (1 - action.ai_autonomy * 0.5)
-        new_fatigue = min(1.0, state.fatigue + fatigue_inc + float(np.random.normal(0, self.noise_std * 0.5)))
+        fatigue_with_noise = state.fatigue + fatigue_inc + float(
+            np.random.normal(0, self.noise_std * 0.5)
+        )
+        new_fatigue = float(np.clip(fatigue_with_noise, 0.0, 1.0))
 
         new_comp = float(np.clip(state.task_complexity + np.random.normal(0, 0.05), 0, 1))
         return State(eoi=new_eoi, fatigue=new_fatigue, task_complexity=new_comp)
@@ -219,8 +222,10 @@ class POMDPPlanner:
             like = self.observation_model.probability(observation, ns, action)
             new_particles.append(Particle(ns, p.weight * like))
 
-        denom = sum((p.weight ** 2) for p in new_particles)
-        ess = (1.0 / denom) if denom > 0 else 0.0
+        weights = [p.weight for p in new_particles]
+        sum_w = float(sum(weights))
+        sum_sq = float(sum(w ** 2 for w in weights))
+        ess = (sum_w ** 2 / sum_sq) if sum_sq > 0 else 0.0
         if ess < self.num_particles / 2:
             new_particles = self._resample(new_particles)
         return BeliefState(new_particles)
