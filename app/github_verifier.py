@@ -2,7 +2,31 @@ import re
 import time
 from typing import Optional
 
-import httpx
+# httpx is an optional dependency in the test environment.  We still want the
+# module to remain importable – the tests monkeypatch ``httpx.AsyncClient`` –
+# even when the real library is unavailable.  A light-weight shim keeps the
+# public surface we rely on while nudging users towards installing httpx when
+# they actually need to perform real network requests.
+try:  # pragma: no cover - exercised implicitly via import
+    import httpx  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - only triggered in slim envs
+    class _MissingAsyncClient:
+        """Minimal stand-in that fails fast when used without httpx installed."""
+
+        def __init__(self, *args, **kwargs) -> None:  # noqa: D401 - simple shim
+            self._reason = "httpx is required to perform GitHub verification"
+
+        async def __aenter__(self):  # pragma: no cover - defensive only
+            raise RuntimeError(self._reason)
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:  # pragma: no cover
+            return None
+
+    class _HttpxFallback:
+        AsyncClient = _MissingAsyncClient
+        TimeoutException = TimeoutError
+
+    httpx = _HttpxFallback()  # type: ignore
 
 from app.config import settings
 from app.monitoring import log, verification_duration
