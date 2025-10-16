@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Index, JSON, Float
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime, timezone
 
@@ -17,6 +17,9 @@ class User(Base):
     display_name = Column(String(200))
     is_active = Column(Boolean, default=True)
     joined_at = Column(DateTime, default=now_utc)
+    reputation_score = Column(Float, default=0.0)
+    level = Column(Integer, default=0)
+    daily_limit = Column(Integer, default=10)
 
     assignments = relationship("Assignment", back_populates="user")
     payments = relationship("Payment", back_populates="user")
@@ -33,6 +36,12 @@ class Task(Base):
     status = Column(String(50), default="available", index=True)
     reward_cents = Column(Integer, default=10000)
     created_at = Column(DateTime, default=now_utc)
+    payload = Column(JSON, nullable=True)
+    level_required = Column(Integer, default=0, index=True)
+    deadline_minutes = Column(Integer, default=24 * 60)
+    type = Column(String(100), nullable=True)
+    bonus_quality_cents = Column(Integer, default=0)
+    bonus_speed_cents = Column(Integer, default=0)
 
     assignments = relationship("Assignment", back_populates="task")
 
@@ -65,8 +74,12 @@ class Assignment(Base):
     due_at = Column(DateTime)
     submitted_at = Column(DateTime, nullable=True)
     evidence_url = Column(Text, nullable=True)
+    submission_payload = Column(Text, nullable=True)
     status = Column(String(50), default="assigned", index=True)  # assigned/submitted/approved/rejected
     verified_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    qc_report = Column(JSON, nullable=True)
+    auto_qc_passed = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="assignments")
     task = relationship("Task", back_populates="assignments")

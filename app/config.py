@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "info"
     ENVIRONMENT: str = "development"
     SENTRY_DSN: Optional[str] = None
+    LEVEL_THRESHOLDS: List[int] | str = [0, 10, 25, 45]
+    QC_MAX_DEDUP_SCORE: float = 0.85
+    QC_MAX_TOXICITY: float = 0.1
+    QC_ALLOW_PII: bool = False
+    QC_MIN_FACT_SCORE: float = 0.6
 
     class Config:
         env_file = ".env"
@@ -44,6 +49,10 @@ settings = Settings()
 # Normalize admin ids if string
 if isinstance(settings.ADMIN_IDS, str):
     settings.ADMIN_IDS = [int(x.strip()) for x in settings.ADMIN_IDS.split(",") if x.strip()]
+
+if isinstance(settings.LEVEL_THRESHOLDS, str):
+    settings.LEVEL_THRESHOLDS = [int(x.strip()) for x in settings.LEVEL_THRESHOLDS.split(",") if x.strip()]
+settings.LEVEL_THRESHOLDS = sorted({int(x) for x in settings.LEVEL_THRESHOLDS})
 
 # Defaults for Celery
 if not settings.CELERY_BROKER_URL:
