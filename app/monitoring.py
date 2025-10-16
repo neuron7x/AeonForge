@@ -64,6 +64,10 @@ else:  # Fallback to the stdlib logger with a similar API surface.
             message = event if not kwargs else f"{event} | {kwargs}"
             self._logger.info(message)
 
+        def warning(self, event: str, **kwargs):
+            message = event if not kwargs else f"{event} | {kwargs}"
+            self._logger.warning(message)
+
         def error(self, event: str, **kwargs):
             message = event if not kwargs else f"{event} | {kwargs}"
             self._logger.error(message)
