@@ -86,7 +86,15 @@ class TransitionModel:
         new_eoi = max(0.0, state.eoi - eoi_reduction + float(np.random.normal(0, self.noise_std)))
 
         fatigue_inc = self.fatigue_acc_rate * (1 - action.ai_autonomy * 0.5)
-        new_fatigue = min(1.0, state.fatigue + fatigue_inc + float(np.random.normal(0, self.noise_std * 0.5)))
+        new_fatigue = float(
+            np.clip(
+                state.fatigue
+                + fatigue_inc
+                + float(np.random.normal(0, self.noise_std * 0.5)),
+                0.0,
+                1.0,
+            )
+        )
 
         new_comp = float(np.clip(state.task_complexity + np.random.normal(0, 0.05), 0, 1))
         return State(eoi=new_eoi, fatigue=new_fatigue, task_complexity=new_comp)
