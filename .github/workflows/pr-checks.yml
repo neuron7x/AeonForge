@@ -1,0 +1,110 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install '.[qa]'
+      - name: Ruff
+        run: ruff check .
+      - name: Mypy
+        run: mypy .
+      - name: Bandit
+        run: bandit -r .
+
+  tests:
+    name: Unit tests with coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install '.[qa]'
+      - name: Pytest
+        run: |
+          pytest --cov-report=xml --cov-report=term-missing
+          mv coverage.xml coverage-pr.xml
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-pr
+          path: coverage-pr.xml
+
+  coverage-base:
+    if: github.event_name == 'pull_request'
+    name: Base branch coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install '.[qa]'
+      - name: Pytest (base)
+        run: |
+          pytest --cov-report=xml --cov-report=term-missing
+          mv coverage.xml coverage-base.xml
+      - name: Upload base coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-base
+          path: coverage-base.xml
+
+  coverage-diff:
+    name: Coverage non-regression
+    needs:
+      - tests
+      - coverage-base
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Download PR coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-pr
+          path: coverage/pr
+      - name: Download base coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-base
+          path: coverage/base
+      - name: Compare coverage
+        run: |
+          python scripts/coverage_diff.py coverage/base/coverage-base.xml coverage/pr/coverage-pr.xml
+
