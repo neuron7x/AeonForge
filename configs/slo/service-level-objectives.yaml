@@ -1,0 +1,34 @@
+service: agi-core
+revision: 1
+objectives:
+  - name: api-availability
+    description: 99.9% of HTTP requests must succeed per 30-day window.
+    sli: request_success_rate
+    target: 0.999
+    alerting:
+      warning: 0.997
+      critical: 0.995
+  - name: api-latency
+    description: P95 latency of public endpoints below 350ms.
+    sli: http_latency_p95
+    target: 0.35
+    unit: seconds
+    alerting:
+      warning: 0.4
+      critical: 0.45
+  - name: order-routing
+    description: 99% of live order submissions must reach exchange within 2s.
+    sli: order_ack_latency_p99
+    target: 2
+    unit: seconds
+    alerting:
+      warning: 3
+      critical: 5
+  - name: ingestion-freshness
+    description: Market data pipelines remain within 10 seconds of head-of-line.
+    sli: ingestion_freshness_lag
+    target: 10
+    unit: seconds
+    alerting:
+      warning: 15
+      critical: 20

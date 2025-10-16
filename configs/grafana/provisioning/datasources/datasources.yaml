@@ -1,0 +1,25 @@
+apiVersion: 1
+
+datasources:
+  - name: TimescaleDB
+    type: postgres
+    url: timescaledb:5432
+    user: postgres
+    secureJsonData:
+      password: postgres
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: true
+      tlsConfigurationMethod: file-path
+      timeInterval: 1m
+      database: timeseries
+  - name: ClickHouse
+    type: vertamedia-clickhouse-datasource
+    access: proxy
+    url: http://clickhouse:8123
+    isDefault: false
+    jsonData:
+      serverVersion: "23"
+      defaultDatabase: default
+      tlsSkipVerify: true

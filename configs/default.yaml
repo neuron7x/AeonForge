@@ -1,0 +1,7 @@
+seed: 42
+task: demo
+logging:
+  level: INFO
+cbc:
+  enable: true
+  eoi_threshold: 1.0

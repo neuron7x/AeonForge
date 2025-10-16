@@ -1,0 +1,12 @@
+[run]
+branch = True
+source = agi_core
+omit =
+    */__init__.py
+    */tests/*
+    */.venv/*
+    */site-packages/*
+
+[report]
+show_missing = True
+fail_under = 0

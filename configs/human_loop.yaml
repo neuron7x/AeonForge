@@ -1,0 +1,6 @@
+agents:
+  - role: architect
+  - role: critic
+  - role: integrator
+publish:
+  targets: [console]

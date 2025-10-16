@@ -1,0 +1,18 @@
+iters: 40
+horizon: 24
+state_dim: 6
+action_dim: 3
+seed: 123
+env: tanh
+model: neural
+meta: linucb
+linucb_mode: diag
+viz_dir: out/viz
+viz_interval: 5
+neural_patience: 6
+timeline_topk: 6
+gif_fps: 6
+log_jsonl: out/run.jsonl
+wandb:
+  enabled: false
+  project: agi-core

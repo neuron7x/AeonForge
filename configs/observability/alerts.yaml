@@ -1,0 +1,19 @@
+alerts:
+  - name: JWTSecretsBackendErrors
+    metric: cbc_jwt_backend_errors_total
+    condition: rate(cbc_jwt_backend_errors_total[5m]) > 0
+    severity: critical
+    description: Detects sustained failures when loading JWT verification secrets.
+    runbook: docs/operations/jwt-secrets-rotation.md
+  - name: JWTAuthFailureSpike
+    metric: cbc_jwt_auth_failures_total
+    condition: rate(cbc_jwt_auth_failures_total[5m]) > 10
+    severity: warning
+    description: Flags sudden spikes in invalid JWTs that may indicate leaked or expired tokens.
+    runbook: docs/operations/jwt-secrets-rotation.md
+  - name: JWTKeyAgeExceeded
+    metric: cbc_jwt_active_key_age_seconds
+    condition: cbc_jwt_active_key_age_seconds > 604800
+    severity: warning
+    description: Ensures the active JWT signing key is rotated at least weekly.
+    runbook: docs/operations/jwt-secrets-rotation.md

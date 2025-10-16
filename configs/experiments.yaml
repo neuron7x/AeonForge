@@ -1,0 +1,11 @@
+# Experiments config for quick ablations
+envs: [tanh, lqr]
+seeds: [0,1,2,3,4]
+models: [linear, neural]
+metas: [linucb, bandit]
+linucb_modes: [diag]
+iters: 50
+horizon: 30
+state_dim: 6
+action_dim: 3
+out: out/ablations

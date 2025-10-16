@@ -1,0 +1,14 @@
+seed: 123
+iterations: 100
+horizon: 48
+envs: [tanh,lqr,reacher,minigrid]
+model: neural
+meta: linucb
+linucb_mode: diag
+state_dim: 6
+action_dim: 3
+neural_patience: 8
+log_dir: out/logs
+viz_dir: out/viz
+gif_fps: 6
+jsonl_path: out/run_release.jsonl

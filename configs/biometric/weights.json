@@ -1,0 +1,26 @@
+{
+  "version": "v1",
+  "generated_at": "2025-10-15T19:52:08.300069+00:00",
+  "dataset": {
+    "records": 1200,
+    "train_records": 960,
+    "val_records": 240,
+    "unique_users": 20
+  },
+  "metrics": {
+    "lr_accuracy": 0.8166666666666667,
+    "pca_variance": 0.1966999286948593,
+    "validation_auc": 0.9346788194444444
+  },
+  "weights": {
+    "w_eq": 0.8,
+    "w_rr": 0.19999999999999996,
+    "w_pca": 0.0
+  },
+  "thresholds": {
+    "green": 0.30971688267959163,
+    "yellow": 0.628819125440383,
+    "orange": 0.9385360081199746,
+    "red": 0.9385360081199746
+  }
+}
