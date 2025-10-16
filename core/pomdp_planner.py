@@ -219,8 +219,9 @@ class POMDPPlanner:
             like = self.observation_model.probability(observation, ns, action)
             new_particles.append(Particle(ns, p.weight * like))
 
-        denom = sum((p.weight ** 2) for p in new_particles)
-        ess = (1.0 / denom) if denom > 0 else 0.0
+        sum_w = sum(p.weight for p in new_particles)
+        sum_sq = sum((p.weight ** 2) for p in new_particles)
+        ess = ((sum_w ** 2) / sum_sq) if sum_sq > 0 else 0.0
         if ess < self.num_particles / 2:
             new_particles = self._resample(new_particles)
         return BeliefState(new_particles)
