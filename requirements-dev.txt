@@ -1,5 +1,6 @@
-pytest>=8.0.0
-pytest-cov>=4.1.0
-hypothesis>=6.106.1
-pytest-benchmark>=4.0.0
-PyYAML>=6.0.1
+pytest
+pytest-cov
+tox
+coverage
+pre-commit
+codecov
